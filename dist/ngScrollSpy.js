@@ -494,17 +494,14 @@ mod.directive('pagemenu', function($compile, $location, $anchorScroll) {
 
 			// basic markup
 			markup += '<li pagemenuspy="' + item.link + '" parent="' + item.parent + '">';
-			markup += '<a href="#' + item.link + '">';
+			markup += '<a ng-click="scrollTo(\'' + item.link + '\')">';
 			markup += item.text;
 			markup += '</a>';
 		}
 		markup += '</li>';
-		element.append($compile(markup)(scope));
 
-		element.on('click', function(e) {
-			// menu item clicked, lets scroll to the associated dom item
-			var hash = e.target.hash.substring(1);
-			$location.hash(hash);
+		scope.scrollTo = function (anchor) {
+			$location.hash(anchor);
 			$anchorScroll();
 			if(getState().topMargin() !== 0 ) {
 				setTimeout(function() {
@@ -515,7 +512,9 @@ mod.directive('pagemenu', function($compile, $location, $anchorScroll) {
 					);
 				}, 0);
 			}
-		});
+		};
+
+		element.append($compile(markup)(scope));
 	};
 
 	return {
