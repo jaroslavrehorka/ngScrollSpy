@@ -313,26 +313,30 @@ var state = {
 			this[k] = s[k];
 		}
 		this.state = true;
-		this.run();
+		//this.run();
 	},
 	builder: null,
 	setBuilder: function(builder) {
 		this.builder = builder;
-		this.run();
+		//this.run();
 	},
+    itemsLoader: null,
+    setItemsLoader: function(itemsLoader) {
+        this.itemsLoader = itemsLoader;
+    },
 	run: function() {
 		if (this.builder && this.state) {
 			this.builder();
 			//this.builder = null;
-			//this.state = null;
+			this.state = null;
 			if(this.onRun) {
 				this.onRun();
-				//this.onRun = null;
+				this.onRun = null;
 			}
 		}
 	}
 };
-mod.directive('pageitems', function(ScrollSpy) {
+mod.directive('pageitems', function(ScrollSpy, $rootScope, $timeout) {
 	var linkfn = function(scope, elem, attrs) {
 		if (!angular.isDefined(scope.selector)) {
 			void 0;
@@ -347,35 +351,19 @@ mod.directive('pageitems', function(ScrollSpy) {
 		};
 
 		// Store my state that pagemenu will use to build the menu
-        var storeItems = function () {
-            getState().store({
-                topMargin: function() {
-                    return scope.topmargin |  0; // so that pagemenu can correctly offset scrolling
-                },
-                addSpy: function(spyObj) {
-                    scope.spies[spyObj.id] = spyObj; // each item in menu calls this function to register itself with pageitems
-                },
-                getSpy: function(id) {
-                    return scope.spies[id]; // return the spy associated with id
-                },
-                items: function() {
-                    return scope.spyElems; // return a list of dom items to be used to build menu
-                }
-            });
-        };
-
-        storeItems();
-
-        scope.$watch(function () {
-            return attrs.reloadOn;
-        }, function (newValue, oldValue) {
-            if(newValue === oldValue) {
-                return;
+        getState().store({
+            topMargin: function() {
+                return scope.topmargin |  0; // so that pagemenu can correctly offset scrolling
+            },
+            addSpy: function(spyObj) {
+                scope.spies[spyObj.id] = spyObj; // each item in menu calls this function to register itself with pageitems
+            },
+            getSpy: function(id) {
+                return scope.spies[id]; // return the spy associated with id
+            },
+            items: function() {
+                return scope.spyElems; // return a list of dom items to be used to build menu
             }
-
-            scope.spyElems = elem[0].getElementsByClassName(scope.selector);
-            storeItems();
-            getState().run();
         });
 
 		var spyElems = scope.spyElems;
@@ -418,7 +406,7 @@ mod.directive('pageitems', function(ScrollSpy) {
 			highlightSpy.set();
 			scope.$on('destroy', function() {
 				ScrollSpy.removeHandler(scrollHandler);
-      });
+            });
 
 		});
 	};
@@ -429,7 +417,22 @@ mod.directive('pageitems', function(ScrollSpy) {
 			selector: '@',
 			topmargin: '@'
 		},
-		link: linkfn
+		link: function (scope, element, attrs) {
+            getState().setItemsLoader(function() {
+                linkfn(scope, element, attrs);
+            });
+
+            getState().itemsLoader();
+
+            scope.$watch(function () {
+                return attrs.reloadOn;
+            }, function () {
+                $timeout(function () { //wait for translate completion
+                    getState().itemsLoader();
+                    getState().run();
+                }, 0);
+            });
+        }
 	};
 });
 mod.directive('pagemenu', function($compile, $location, $anchorScroll) {
