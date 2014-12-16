@@ -323,11 +323,11 @@ var state = {
 	run: function() {
 		if (this.builder && this.state) {
 			this.builder();
-			this.builder= null;
-			this.state= null;
+			//this.builder = null;
+			//this.state = null;
 			if(this.onRun) {
 				this.onRun();
-				this.onRun= null;
+				//this.onRun = null;
 			}
 		}
 	}
@@ -347,20 +347,36 @@ mod.directive('pageitems', function(ScrollSpy) {
 		};
 
 		// Store my state that pagemenu will use to build the menu
-		getState().store({
-			topMargin: function() {
-				return scope.topmargin |  0; // so that pagemenu can correctly offset scrolling
-			},
-			addSpy: function(spyObj) {
-				scope.spies[spyObj.id] = spyObj; // each item in menu calls this function to register itself with pageitems
-			},
-			getSpy: function(id) {
-				return scope.spies[id]; // return the spy associated with id
-			},
-			items: function() {
-				return scope.spyElems; // return a list of dom items to be used to build menu
-			}
-		});
+        var storeItems = function () {
+            getState().store({
+                topMargin: function() {
+                    return scope.topmargin |  0; // so that pagemenu can correctly offset scrolling
+                },
+                addSpy: function(spyObj) {
+                    scope.spies[spyObj.id] = spyObj; // each item in menu calls this function to register itself with pageitems
+                },
+                getSpy: function(id) {
+                    return scope.spies[id]; // return the spy associated with id
+                },
+                items: function() {
+                    return scope.spyElems; // return a list of dom items to be used to build menu
+                }
+            });
+        };
+
+        storeItems();
+
+        scope.$watch(function () {
+            return attrs.reloadOn;
+        }, function (newValue, oldValue) {
+            if(newValue === oldValue) {
+                return;
+            }
+
+            scope.spyElems = elem[0].getElementsByClassName(scope.selector);
+            storeItems();
+            getState().run();
+        });
 
 		var spyElems = scope.spyElems;
 		var topmargin = scope.topmargin | 0;
@@ -374,7 +390,7 @@ mod.directive('pageitems', function(ScrollSpy) {
 				var spy = spies[spyElem.id];
 				spy.clear();
 
-				if (spyElem.getBoundingClientRect().top === undefined) {
+				if (typeof spyElem.getBoundingClientRect().top === 'undefined') {
 					continue;
 				}
 
@@ -473,32 +489,31 @@ mod.directive('pagemenu', function($compile, $location, $anchorScroll) {
 			lastitem= item.link;
 			return item;
 		};
+        // dom items to build menu from
+        var items = getState().items();
+        var markup = '';
+        for (var i = 0; i < items.length; i++) {
+            var item = itemConstruct(items[i]);
+            if (item.push) {
+                // new submenu
+                markup += '<menu class="nav">';
+            } else if (item.pop) {
+                // closing submenu, maybe more than one
+                for (var j = 0; j < item.pop; j++) {
+                    markup += '</li></menu>';
+                }
+            } else if (i !== 0) {
+                // sibling
+                markup += '</li>';
+            }
 
-		// dom items to build menu from
-		var items = getState().items();
-		var markup = '';
-		for (var i = 0; i < items.length; i++) {
-			var item = itemConstruct(items[i]);
-			if (item.push) {
-				// new submenu
-				markup += '<menu class="nav">';
-			} else if (item.pop) {
-				// closing submenu, maybe more than one
-				for (var j = 0; j < item.pop; j++) {
-					markup += '</li></menu>';
-				}
-			} else if (i !== 0) {
-				// sibling
-				markup += '</li>';
-			}
-
-			// basic markup
-			markup += '<li pagemenuspy="' + item.link + '" parent="' + item.parent + '">';
-			markup += '<a ng-click="scrollTo(\'' + item.link + '\')">';
-			markup += item.text;
-			markup += '</a>';
-		}
-		markup += '</li>';
+            // basic markup
+            markup += '<li pagemenuspy="' + item.link + '" parent="' + item.parent + '">';
+            markup += '<a ng-click="scrollTo(\'' + item.link + '\')">';
+            markup += item.text;
+            markup += '</a>';
+        }
+        markup += '</li>';
 
 		scope.scrollTo = function (anchor) {
 			$location.hash(anchor);
@@ -514,7 +529,7 @@ mod.directive('pagemenu', function($compile, $location, $anchorScroll) {
 			}
 		};
 
-		element.append($compile(markup)(scope));
+		element.html($compile(markup)(scope));
 	};
 
 	return {
